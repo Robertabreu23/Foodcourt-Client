@@ -1,56 +1,56 @@
-# Welcome to your Expo app 👋
+# FoodCourt — Cliente (Expo + TypeScript)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Frontend de la app de delivery **FoodCourt** (RD). Consume el backend Node/Express
+que corre en el puerto **3000**. No hay backend aquí: solo pantallas.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Correr
 
 ```bash
-npm run reset-project
+npm install
+npm start          # abre el menú de Expo (i = iOS, a = Android)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+> El backend debe estar corriendo antes: `http://localhost:3000`.
 
-### Other setup steps
+## URL del API (importante)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Está centralizada en **`src/config.ts`**:
 
-## Learn more
+| Dónde pruebas              | URL que usa                         |
+| -------------------------- | ----------------------------------- |
+| iOS Simulator              | `http://localhost:3000` (automático)|
+| Android Emulator           | `http://10.0.2.2:3000` (automático) |
+| Celular físico con Expo Go | pon tu IP LAN en `LAN_IP` y `USE_LAN = true` |
 
-To learn more about developing your project with Expo, look at the following resources:
+Tu IP LAN: Mac → `ipconfig getifaddr en0` · Windows → `ipconfig` (IPv4).
+El celular y la PC deben estar en la **misma red WiFi**.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Pantallas
 
-## Join the community
+- **Inicio** (`src/app/(tabs)/index.tsx`): lista de locales (`GET /stores`) con
+  portada (o color de marca + inicial si no hay foto), rating, envío, tiempo y
+  badge Abierto/Cerrado. Pull-to-refresh, loading y reintentar.
+- **Perfil** (`src/app/(tabs)/perfil.tsx`): flujo del dueño.
+  - Sin sesión → login (`POST /users/login`), token guardado en SecureStore.
+  - Con sesión → mis locales (`GET /stores/mias`), editar nombre/categoría y
+    cambiar portada con ImagePicker (`PUT /stores/:id` multipart), cerrar sesión.
+- **Buscar / Pedidos**: placeholders visuales del tab bar.
 
-Join our community of developers creating universal apps.
+Cuenta de prueba: `owner@foodcourt.do` / `clave12345`
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Estructura
+
+```
+src/
+  config.ts            # API_URL (único lugar a cambiar)
+  types.ts             # Store, User, AuthResponse
+  theme.ts             # paleta FoodCourt + helpers (darken, initials)
+  lib/api.ts           # cliente del API tipado (fetch)
+  lib/session.ts       # token en expo-secure-store
+  components/store-cover.tsx
+  app/
+    _layout.tsx
+    (tabs)/_layout.tsx # tabs: Inicio · Buscar · Pedidos · Perfil
+    (tabs)/index.tsx   # Home
+    (tabs)/perfil.tsx  # Login + Editar mi local
+```
