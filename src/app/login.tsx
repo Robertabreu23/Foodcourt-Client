@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -14,7 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ApiError, login, register } from "@/lib/api";
+import { ApiError, login, olvidePassword, register } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { colors } from "@/theme";
 
@@ -33,6 +34,7 @@ export default function LoginScreen() {
   const [foco, setFoco] = useState<Campo>("email");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [olvide, setOlvide] = useState(false);
 
   const esRegistro = modo === "registro";
 
@@ -101,7 +103,7 @@ export default function LoginScreen() {
           <View style={styles.logoBox}>
             <Text style={styles.logoText}>F</Text>
           </View>
-          <Text style={styles.title}>FoodCourt</Text>
+          <Text style={styles.title}>Foodclub</Text>
           <Text style={styles.sub}>
             Pide de tus locales favoritos,{"\n"}cada uno con su propio sabor.
           </Text>
@@ -192,7 +194,7 @@ export default function LoginScreen() {
           </CampoInput>
 
           {!esRegistro && (
-            <TouchableOpacity style={styles.olvidaste}>
+            <TouchableOpacity style={styles.olvidaste} onPress={() => setOlvide(true)}>
               <Text style={styles.olvidasteText}>¿Olvidaste tu contraseña?</Text>
             </TouchableOpacity>
           )}
@@ -235,7 +237,113 @@ export default function LoginScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {olvide && (
+        <ModalOlvide emailInicial={email} onCerrar={() => setOlvide(false)} />
+      )}
     </KeyboardAvoidingView>
+  );
+}
+
+/**
+ * "Olvidé mi contraseña".
+ *
+ * El backend responde `200` exista o no el correo, a propósito: si
+ * distinguiera, cualquiera podría averiguar quién tiene cuenta aquí probando
+ * emails. Por eso el mensaje de éxito es siempre el mismo y no intentamos
+ * deducir nada.
+ */
+function ModalOlvide({
+  emailInicial,
+  onCerrar,
+}: {
+  emailInicial: string;
+  onCerrar: () => void;
+}) {
+  const [correo, setCorreo] = useState(emailInicial);
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const enviar = async () => {
+    if (!correo.trim()) {
+      setError("Escribe tu correo.");
+      return;
+    }
+    setEnviando(true);
+    setError(null);
+    try {
+      await olvidePassword(correo.trim());
+      setEnviado(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo enviar. Intenta de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <Modal transparent animationType="fade" onRequestClose={onCerrar}>
+      <View style={styles.modalFondo}>
+        <View style={styles.modalCaja}>
+          {enviado ? (
+            <>
+              <View style={styles.modalIcono}>
+                <Ionicons name="mail-outline" size={26} color={colors.fc} />
+              </View>
+              <Text style={styles.modalTitulo}>Revisa tu correo</Text>
+              <Text style={styles.modalTexto}>
+                Si ese correo tiene una cuenta, te enviamos un enlace para restablecer tu
+                contraseña. Vence en una hora.
+              </Text>
+              <TouchableOpacity style={styles.modalCta} onPress={onCerrar}>
+                <Text style={styles.modalCtaText}>Entendido</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.modalTitulo}>¿Olvidaste tu contraseña?</Text>
+              <Text style={styles.modalTexto}>
+                Escribe tu correo y te mandamos un enlace para ponerte una nueva.
+              </Text>
+
+              <View style={[styles.inputRow, { marginTop: 16 }]}>
+                <Ionicons name="mail-outline" size={18} color="#9A8D86" />
+                <TextInput
+                  style={styles.input}
+                  value={correo}
+                  onChangeText={setCorreo}
+                  placeholder="maria.diaz@gmail.com"
+                  placeholderTextColor={colors.faint}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoFocus
+                />
+              </View>
+
+              {error && <Text style={styles.formError}>{error}</Text>}
+
+              <View style={styles.modalBotones}>
+                <TouchableOpacity style={styles.modalSecundario} onPress={onCerrar}>
+                  <Text style={styles.modalSecundarioText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalCtaAncho, enviando && styles.ctaDisabled]}
+                  onPress={enviar}
+                  disabled={enviando}
+                >
+                  {enviando ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.modalCtaText}>Enviar enlace</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -414,4 +522,50 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 20,
   },
+
+  modalFondo: {
+    flex: 1,
+    backgroundColor: "rgba(36,27,25,0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCaja: { backgroundColor: colors.surface, borderRadius: 22, padding: 22 },
+  modalIcono: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: colors.fcSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  modalTitulo: { fontSize: 19, fontWeight: "800", color: colors.ink },
+  modalTexto: { fontSize: 13.5, color: colors.muted, lineHeight: 20, marginTop: 8 },
+  modalBotones: { flexDirection: "row", gap: 10, marginTop: 20 },
+  modalCta: {
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: colors.fc,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+  modalCtaAncho: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: colors.fc,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCtaText: { color: "#FFF", fontWeight: "800", fontSize: 15 },
+  modalSecundario: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: colors.paper,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecundarioText: { color: colors.ink, fontWeight: "700", fontSize: 15 },
 });

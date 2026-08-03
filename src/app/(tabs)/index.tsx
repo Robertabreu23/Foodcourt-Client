@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,6 +18,7 @@ import { DeliveryIllustration } from "@/components/delivery-illustration";
 import { StoreCover } from "@/components/store-cover";
 import { getStores } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useCart } from "@/lib/cart-context";
 import { colors } from "@/theme";
 import type { Store } from "@/types";
 
@@ -99,6 +101,7 @@ export default function HomeScreen() {
 
 function Header() {
   const { user } = useAuth();
+  const { cantidadTotal } = useCart();
   const inicial = user?.nombre?.trim()?.[0]?.toUpperCase() ?? "F";
   return (
     <View style={styles.header}>
@@ -112,6 +115,18 @@ function Header() {
           </View>
         </View>
         <View style={styles.headerIcons}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/carrito")}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="basket-outline" size={19} color={colors.ink} />
+            {cantidadTotal > 0 && (
+              <View style={styles.badgeCarrito}>
+                <Text style={styles.badgeCarritoText}>{cantidadTotal}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.iconBtn}>
             <Ionicons name="notifications-outline" size={19} color={colors.ink} />
             <View style={styles.dot} />
@@ -196,7 +211,21 @@ function StoreCard({ store }: { store: Store }) {
       : "Tiempo por confirmar";
 
   return (
-    <TouchableOpacity activeOpacity={0.85} style={styles.card}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={styles.card}
+      onPress={() =>
+        router.push({
+          pathname: "/store/[id]",
+          params: {
+            id: String(store.id),
+            // La carta no devuelve estos dos, así que se los pasamos nosotros.
+            colorMarca: store.colorMarca,
+            ...(store.portadaUrl ? { portadaUrl: store.portadaUrl } : {}),
+          },
+        })
+      }
+    >
       <StoreCover store={store}>
         {/* pill con nombre + color de marca */}
         <View style={styles.coverNamePill}>
@@ -283,6 +312,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface,
   },
+  badgeCarrito: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    minWidth: 19,
+    height: 19,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    backgroundColor: colors.fc,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeCarritoText: { color: "#FFF", fontSize: 10, fontWeight: "800" },
   avatar: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#FFF", fontWeight: "800", fontSize: 15 },
 

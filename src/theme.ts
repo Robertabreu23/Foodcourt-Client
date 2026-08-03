@@ -1,4 +1,4 @@
-/** Paleta FoodCourt (tomada del diseño HTML). */
+/** Paleta Foodclub (tomada del diseño HTML). */
 export const colors = {
   fc: "#FF5A36", // coral de marca
   fcSoft: "#FFE7DF",

@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,7 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { StoreCover } from "@/components/store-cover";
-import { ApiError, getMisLocales, updateStore } from "@/lib/api";
+import { ApiError, cambiarPassword, getMisLocales, updateStore } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { colors, initials } from "@/theme";
 import type { Store } from "@/types";
@@ -44,6 +46,7 @@ function OwnerPanel({ token, nombreUsuario, onCerrarSesion }: OwnerProps) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [seleccionado, setSeleccionado] = useState<Store | null>(null);
+  const [cambiandoPass, setCambiandoPass] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -105,6 +108,22 @@ function OwnerPanel({ token, nombreUsuario, onCerrarSesion }: OwnerProps) {
         </TouchableOpacity>
       </View>
 
+      {/* Accesos de la cuenta — valen igual para cliente y para dueño. */}
+      <View style={styles.accesos}>
+        <Acceso
+          icono="location-outline"
+          titulo="Mis direcciones"
+          sub="Dónde recibes tus pedidos"
+          onPress={() => router.push("/direcciones")}
+        />
+        <Acceso
+          icono="key-outline"
+          titulo="Cambiar contraseña"
+          sub="Te pediremos la actual"
+          onPress={() => setCambiandoPass(true)}
+        />
+      </View>
+
       <View style={styles.panelHeader}>
         <Text style={styles.panelTitle}>Mi local</Text>
       </View>
@@ -135,27 +154,197 @@ function OwnerPanel({ token, nombreUsuario, onCerrarSesion }: OwnerProps) {
             <Text style={styles.panelSub}>Elige el local que quieres editar:</Text>
           )}
           {locales.map((s) => (
-            <TouchableOpacity
-              key={s.id}
-              style={styles.localItem}
-              activeOpacity={0.8}
-              onPress={() => setSeleccionado(s)}
-            >
-              <StoreCover store={s} height={56} style={styles.localThumb} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.localNombre} numberOfLines={1}>
-                  {s.nombre}
-                </Text>
-                <Text style={styles.localMeta}>
-                  {s.categoria ?? "Sin categoría"} · {s.estadoVerificacion}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.faint} />
-            </TouchableOpacity>
+            <View key={s.id} style={styles.localCard}>
+              <TouchableOpacity
+                style={styles.localItem}
+                activeOpacity={0.8}
+                onPress={() => setSeleccionado(s)}
+              >
+                <StoreCover store={s} height={56} style={styles.localThumb} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.localNombre} numberOfLines={1}>
+                    {s.nombre}
+                  </Text>
+                  <Text style={styles.localMeta}>
+                    {s.categoria ?? "Sin categoría"} · {s.estadoVerificacion}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.faint} />
+              </TouchableOpacity>
+
+              {/* La cola de pedidos es lo que más se abre: va en primer plano. */}
+              <TouchableOpacity
+                style={styles.pedidosBtn}
+                activeOpacity={0.85}
+                onPress={() =>
+                  router.push({
+                    pathname: "/gestion/pedidos/[storeId]",
+                    params: { storeId: String(s.id) },
+                  })
+                }
+              >
+                <Ionicons name="receipt-outline" size={16} color="#FFF" />
+                <Text style={styles.pedidosBtnText}>Ver pedidos del local</Text>
+              </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
       )}
+
+      {cambiandoPass && (
+        <ModalPassword token={token} onCerrar={() => setCambiandoPass(false)} />
+      )}
     </SafeAreaView>
+  );
+}
+
+/* ================= PIEZAS DE LA CUENTA ================= */
+
+function Acceso({
+  icono,
+  titulo,
+  sub,
+  onPress,
+}: {
+  icono: keyof typeof Ionicons.glyphMap;
+  titulo: string;
+  sub: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.acceso} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.accesoIcono}>
+        <Ionicons name={icono} size={18} color={colors.fc} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.accesoTitulo}>{titulo}</Text>
+        <Text style={styles.accesoSub}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.faint} />
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * Cambiar la contraseña sabiéndola.
+ *
+ * Se pide la actual aunque ya haya sesión: un token puede estar en un celular
+ * que quedó desbloqueado encima de una mesa. El backend responde `401` si no
+ * coincide — el mismo código que si el token venciera, así que aquí hay que
+ * distinguirlos con cuidado para no cerrar la sesión por una clave mal escrita.
+ */
+function ModalPassword({ token, onCerrar }: { token: string; onCerrar: () => void }) {
+  const [actual, setActual] = useState("");
+  const [nueva, setNueva] = useState("");
+  const [repetir, setRepetir] = useState("");
+  const [ver, setVer] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const enviar = async () => {
+    if (!actual) return setError("Escribe tu contraseña actual.");
+    if (nueva.length < 8) return setError("La nueva debe tener al menos 8 caracteres.");
+    if (nueva === actual) return setError("La nueva tiene que ser distinta de la actual.");
+    if (nueva !== repetir) return setError("Las dos contraseñas nuevas no coinciden.");
+
+    setEnviando(true);
+    setError(null);
+    try {
+      await cambiarPassword(token, actual, nueva);
+      onCerrar();
+      Alert.alert("Listo", "Tu contraseña quedó actualizada. Tu sesión sigue abierta.");
+    } catch (e) {
+      // Aquí un 401 significa "la contraseña actual no coincide", NO que la
+      // sesión venció: por eso no se cierra sesión.
+      setError(
+        e instanceof ApiError && e.status === 401
+          ? "Tu contraseña actual no es correcta."
+          : e instanceof Error
+            ? e.message
+            : "No se pudo cambiar.",
+      );
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <Modal transparent animationType="fade" onRequestClose={onCerrar}>
+      <KeyboardAvoidingView
+        style={styles.modalFondo}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={styles.modalCaja}>
+          <Text style={styles.modalTitulo}>Cambiar contraseña</Text>
+          <Text style={styles.modalTexto}>
+            Te pedimos la actual por seguridad, aunque ya hayas iniciado sesión.
+          </Text>
+
+          <Text style={styles.inputLabel}>Contraseña actual</Text>
+          <View style={styles.inputRow}>
+            <Ionicons name="lock-closed-outline" size={18} color="#9A8D86" />
+            <TextInput
+              style={styles.input}
+              value={actual}
+              onChangeText={setActual}
+              placeholder="La de siempre"
+              placeholderTextColor={colors.faint}
+              secureTextEntry={!ver}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => setVer((v) => !v)} hitSlop={10}>
+              <Ionicons name={ver ? "eye-off-outline" : "eye-outline"} size={19} color="#9A8D86" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.inputLabel}>Nueva</Text>
+          <View style={styles.inputRow}>
+            <Ionicons name="key-outline" size={18} color="#9A8D86" />
+            <TextInput
+              style={styles.input}
+              value={nueva}
+              onChangeText={setNueva}
+              placeholder="Al menos 8 caracteres"
+              placeholderTextColor={colors.faint}
+              secureTextEntry={!ver}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <Text style={styles.inputLabel}>Repite la nueva</Text>
+          <View style={styles.inputRow}>
+            <Ionicons name="key-outline" size={18} color="#9A8D86" />
+            <TextInput
+              style={styles.input}
+              value={repetir}
+              onChangeText={setRepetir}
+              placeholder="La misma de arriba"
+              placeholderTextColor={colors.faint}
+              secureTextEntry={!ver}
+              autoCapitalize="none"
+            />
+          </View>
+
+          {error && <Text style={styles.formError}>{error}</Text>}
+
+          <View style={styles.modalBotones}>
+            <TouchableOpacity style={styles.modalSecundario} onPress={onCerrar}>
+              <Text style={styles.modalSecundarioText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalPrimario, enviando && styles.ctaDisabled]}
+              onPress={enviar}
+              disabled={enviando}
+            >
+              {enviando ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.ctaText}>Guardar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -173,6 +362,7 @@ function EditarLocal({ token, store, onBack, onSaved, onSessionExpired }: Editar
   const [nombre, setNombre] = useState(store.nombre);
   const [categoria, setCategoria] = useState(store.categoria ?? "");
   const [imagenUri, setImagenUri] = useState<string | null>(null);
+  const [quitarPortada, setQuitarPortada] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -191,8 +381,28 @@ function EditarLocal({ token, store, onBack, onSaved, onSessionExpired }: Editar
     });
     if (!result.canceled && result.assets[0]) {
       setImagenUri(result.assets[0].uri);
+      setQuitarPortada(false); // elegir una foto cancela el "quitar" pendiente
       setOk(false);
     }
+  };
+
+  const quitarFotoActual = () => {
+    if (imagenUri) {
+      // Todavía no se ha subido: basta con descartarla.
+      setImagenUri(null);
+      return;
+    }
+    Alert.alert("Quitar la portada", "El local quedará con su color de marca. ¿Seguro?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Quitar",
+        style: "destructive",
+        onPress: () => {
+          setQuitarPortada(true);
+          setOk(false);
+        },
+      },
+    ]);
   };
 
   const guardar = async () => {
@@ -208,8 +418,10 @@ function EditarLocal({ token, store, onBack, onSaved, onSessionExpired }: Editar
         nombre: nombre.trim(),
         categoria: categoria.trim() || undefined,
         imagenUri,
+        quitarPortada,
       });
       setImagenUri(null); // la portada ya vive en el servidor
+      setQuitarPortada(false);
       onSaved(actualizado);
       setOk(true);
     } catch (e) {
@@ -243,15 +455,58 @@ function EditarLocal({ token, store, onBack, onSaved, onSessionExpired }: Editar
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           {/* Vista previa de la portada */}
           <View style={styles.previewCard}>
-            <StoreCover store={store} height={170} overrideUri={imagenUri} />
-            <TouchableOpacity style={styles.fotoBtn} onPress={elegirFoto} activeOpacity={0.85}>
-              <Ionicons name="camera-outline" size={16} color="#FFF" />
-              <Text style={styles.fotoBtnText}>Cambiar foto</Text>
-            </TouchableOpacity>
+            <StoreCover
+              store={store}
+              height={170}
+              overrideUri={imagenUri}
+              sinImagen={quitarPortada}
+            />
+            <View style={styles.fotoAcciones}>
+              <TouchableOpacity style={styles.fotoBtn} onPress={elegirFoto} activeOpacity={0.85}>
+                <Ionicons name="camera-outline" size={16} color="#FFF" />
+                <Text style={styles.fotoBtnText}>Cambiar foto</Text>
+              </TouchableOpacity>
+              {/* Solo tiene sentido si hay algo que quitar. */}
+              {(imagenUri || (store.portadaUrl && !quitarPortada)) && (
+                <TouchableOpacity
+                  style={styles.fotoBtn}
+                  onPress={quitarFotoActual}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFF" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          {imagenUri && (
+          {imagenUri && !quitarPortada && (
             <Text style={styles.fotoHint}>Foto nueva seleccionada — guarda para subirla.</Text>
           )}
+          {quitarPortada && (
+            <Text style={styles.fotoHintQuitar}>
+              Se quitará la portada al guardar. Quedará el color de marca.
+            </Text>
+          )}
+
+          {/* Atajo al panel de la carta: secciones, platos y opciones. */}
+          <TouchableOpacity
+            style={styles.cartaBtn}
+            onPress={() =>
+              router.push({
+                pathname: "/gestion/[storeId]",
+                params: { storeId: String(store.id) },
+              })
+            }
+            activeOpacity={0.85}
+          >
+            <View style={styles.cartaIcono}>
+              <Ionicons name="restaurant-outline" size={18} color={colors.fc} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cartaTitulo}>Gestionar la carta</Text>
+              <Text style={styles.cartaSub}>Secciones, platos y grupos de opciones</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.faint} />
+          </TouchableOpacity>
 
           <Text style={styles.inputLabel}>Nombre del local</Text>
           <View style={styles.inputRow}>
@@ -351,7 +606,84 @@ const styles = StyleSheet.create({
   emptyBox: { alignItems: "center", gap: 8, paddingVertical: 30, paddingHorizontal: 12 },
   emptyTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
 
+  accesos: { paddingHorizontal: 18, marginTop: 14, gap: 10 },
+  acceso: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 16,
+    padding: 13,
+  },
+  accesoIcono: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.fcSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accesoTitulo: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
+  accesoSub: { fontSize: 12, fontWeight: "500", color: colors.muted, marginTop: 2 },
+
+  localCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 18,
+    padding: 12,
+    gap: 12,
+  },
   localItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  pedidosBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    height: 46,
+    borderRadius: 13,
+    backgroundColor: colors.ink,
+  },
+  pedidosBtnText: { color: "#FFF", fontSize: 14, fontWeight: "800" },
+
+  modalFondo: {
+    flex: 1,
+    backgroundColor: "rgba(36,27,25,0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCaja: { backgroundColor: colors.surface, borderRadius: 22, padding: 22 },
+  modalTitulo: { fontSize: 19, fontWeight: "800", color: colors.ink },
+  modalTexto: { fontSize: 13, color: colors.muted, lineHeight: 19, marginTop: 6, marginBottom: 8 },
+  modalBotones: { flexDirection: "row", gap: 10, marginTop: 18 },
+  modalPrimario: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: colors.fc,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecundario: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: colors.paper,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecundarioText: { color: colors.ink, fontWeight: "700", fontSize: 15 },
+  localThumb: { width: 56, borderRadius: 14 },
+  localNombre: { fontSize: 16, fontWeight: "800", color: colors.ink },
+  localMeta: { fontSize: 12.5, fontWeight: "500", color: colors.muted, marginTop: 2 },
+
+  cartaBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -359,11 +691,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 18,
-    padding: 12,
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 4,
   },
-  localThumb: { width: 56, borderRadius: 14 },
-  localNombre: { fontSize: 16, fontWeight: "800", color: colors.ink },
-  localMeta: { fontSize: 12.5, fontWeight: "500", color: colors.muted, marginTop: 2 },
+  cartaIcono: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.fcSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartaTitulo: { fontSize: 15.5, fontWeight: "800", color: colors.ink },
+  cartaSub: { fontSize: 12.5, fontWeight: "500", color: colors.muted, marginTop: 2 },
 
   inputLabel: { fontSize: 13, fontWeight: "700", color: colors.ink, marginBottom: 7, marginTop: 4 },
   inputRow: {
@@ -403,10 +744,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     marginBottom: 8,
   },
+  fotoAcciones: { position: "absolute", right: 12, bottom: 12, flexDirection: "row", gap: 8 },
   fotoBtn: {
-    position: "absolute",
-    right: 12,
-    bottom: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -417,6 +756,7 @@ const styles = StyleSheet.create({
   },
   fotoBtnText: { color: "#FFF", fontSize: 12.5, fontWeight: "700" },
   fotoHint: { fontSize: 12.5, fontWeight: "600", color: colors.leaf, marginBottom: 10 },
+  fotoHintQuitar: { fontSize: 12.5, fontWeight: "600", color: colors.fcDeep, marginBottom: 10 },
   okBox: {
     flexDirection: "row",
     alignItems: "center",

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Foodcourt-Client",
-    "slug": "Foodcourt-Client",
+    "name": "Foodclub",
+    "slug": "Foodclub-Client",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,7 +12,7 @@
       "bundleIdentifier": "do.foodcourt.client"
     },
     "android": {
-      "package": "do.foodcourt.client",
+      "package": "com.foodcourt.client",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

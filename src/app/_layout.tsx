@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { CartProvider } from "@/lib/cart-context";
 import { colors } from "@/theme";
 
 function RootNavigator() {
@@ -19,13 +20,24 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Sin sesión → solo existe el login */}
+      {/* Sin sesión: login y el enlace de restablecer del correo, que
+          justamente se abre cuando el usuario NO puede entrar. */}
       <Stack.Protected guard={!token}>
         <Stack.Screen name="login" />
+        <Stack.Screen name="restablecer" />
       </Stack.Protected>
-      {/* Con sesión → los tabs de la app */}
+      {/* Con sesión → los tabs y las pantallas que se abren encima */}
       <Stack.Protected guard={!!token}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="store/[id]" />
+        <Stack.Screen name="item/[id]" />
+        <Stack.Screen name="carrito" />
+        <Stack.Screen name="checkout" />
+        <Stack.Screen name="pedido/[id]" />
+        <Stack.Screen name="direcciones" />
+        <Stack.Screen name="gestion/[storeId]" />
+        <Stack.Screen name="gestion/plato" />
+        <Stack.Screen name="gestion/pedidos/[storeId]" />
       </Stack.Protected>
     </Stack>
   );
@@ -34,8 +46,10 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="dark" />
-      <RootNavigator />
+      <CartProvider>
+        <StatusBar style="dark" />
+        <RootNavigator />
+      </CartProvider>
     </AuthProvider>
   );
 }

@@ -42,3 +42,5 @@ example
 /ios
 /android
 .env
+
+config.ts
