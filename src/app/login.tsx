@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -31,15 +30,15 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [verPass, setVerPass] = useState(false);
-  const [foco, setFoco] = useState<Campo>("email");
+  const [foco, setFoco] = useState<Campo>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [olvide, setOlvide] = useState(false);
 
   const esRegistro = modo === "registro";
 
-  const cambiarModo = (m: "login" | "registro") => {
-    setModo(m);
+  const cambiarModo = () => {
+    setModo(esRegistro ? "login" : "registro");
     setError(null);
   };
 
@@ -84,164 +83,161 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView
+      style={styles.pantalla}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <ScrollView
-        style={styles.screen}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={[
+          styles.contenido,
+          { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 32 },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ===== Hero coral con círculos decorativos ===== */}
-        <LinearGradient
-          colors={[colors.fc, "#FF8347"]}
-          start={{ x: 0.15, y: 0 }}
-          end={{ x: 0.85, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + 36 }]}
-        >
-          <View style={styles.circuloArriba} />
-          <View style={styles.circuloAbajo} />
+        {/* ===== Marca ===== */}
+        <View style={styles.marca}>
           <View style={styles.logoBox}>
             <Text style={styles.logoText}>F</Text>
           </View>
-          <Text style={styles.title}>Foodclub</Text>
-          <Text style={styles.sub}>
-            Pide de tus locales favoritos,{"\n"}cada uno con su propio sabor.
-          </Text>
-        </LinearGradient>
-
-        {/* ===== Tarjeta blanca ===== */}
-        <View style={styles.card}>
-          <View style={styles.segment}>
-            <TouchableOpacity
-              style={[styles.segmentItem, !esRegistro && styles.segmentActive]}
-              onPress={() => cambiarModo("login")}
-            >
-              <Text style={!esRegistro ? styles.segmentActiveText : styles.segmentText}>
-                Iniciar sesión
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.segmentItem, esRegistro && styles.segmentActive]}
-              onPress={() => cambiarModo("registro")}
-            >
-              <Text style={esRegistro ? styles.segmentActiveText : styles.segmentText}>
-                Crear cuenta
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {esRegistro && (
-            <>
-              <Text style={styles.inputLabel}>Nombre</Text>
-              <CampoInput activo={foco === "nombre"} icono="person-outline">
-                <TextInput
-                  style={styles.input}
-                  value={nombre}
-                  onChangeText={setNombre}
-                  onFocus={() => setFoco("nombre")}
-                  placeholder="Ej: María Díaz"
-                  placeholderTextColor={colors.faint}
-                  autoComplete="name"
-                />
-              </CampoInput>
-
-              <Text style={styles.inputLabel}>Teléfono</Text>
-              <CampoInput activo={foco === "telefono"} icono="call-outline">
-                <TextInput
-                  style={styles.input}
-                  value={telefono}
-                  onChangeText={setTelefono}
-                  onFocus={() => setFoco("telefono")}
-                  placeholder="809-555-0000"
-                  placeholderTextColor={colors.faint}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                />
-              </CampoInput>
-            </>
-          )}
-
-          <Text style={styles.inputLabel}>Correo o teléfono</Text>
-          <CampoInput activo={foco === "email"} icono="mail-outline">
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setFoco("email")}
-              placeholder="maria.diaz@gmail.com"
-              placeholderTextColor={colors.faint}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-            />
-          </CampoInput>
-
-          <Text style={styles.inputLabel}>Contraseña</Text>
-          <CampoInput activo={foco === "password"} icono="lock-closed-outline">
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => setFoco("password")}
-              placeholder="••••••••"
-              placeholderTextColor={colors.faint}
-              secureTextEntry={!verPass}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity onPress={() => setVerPass((v) => !v)} hitSlop={10}>
-              <Ionicons name={verPass ? "eye-off-outline" : "eye-outline"} size={19} color="#9A8D86" />
-            </TouchableOpacity>
-          </CampoInput>
-
-          {!esRegistro && (
-            <TouchableOpacity style={styles.olvidaste} onPress={() => setOlvide(true)}>
-              <Text style={styles.olvidasteText}>¿Olvidaste tu contraseña?</Text>
-            </TouchableOpacity>
-          )}
-
-          {error && <Text style={styles.formError}>{error}</Text>}
-
-          <TouchableOpacity
-            style={[styles.cta, enviando && styles.ctaDisabled]}
-            onPress={entrar}
-            disabled={enviando}
-            activeOpacity={0.85}
-          >
-            {enviando ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.ctaText}>{esRegistro ? "Crear cuenta" : "Entrar"}</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* ===== o continúa con ===== */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>o continúa con</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-              <Text style={styles.googleG}>G</Text>
-              <Text style={styles.socialText}>Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-              <Ionicons name="logo-apple" size={18} color="#111" />
-              <Text style={styles.socialText}>Apple</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.legal}>
-            Al continuar aceptas los Términos{"\n"}y la Política de privacidad.
-          </Text>
+          <Text style={styles.wordmark}>Foodclub</Text>
         </View>
+
+        {/* ===== Campos ===== */}
+        {esRegistro && (
+          <>
+            <CampoInput activo={foco === "nombre"} icono="person-outline">
+              <TextInput
+                style={styles.input}
+                value={nombre}
+                onChangeText={setNombre}
+                onFocus={() => setFoco("nombre")}
+                onBlur={() => setFoco(null)}
+                placeholder="Nombre"
+                placeholderTextColor={colors.faint}
+                autoComplete="name"
+              />
+            </CampoInput>
+
+            <CampoInput activo={foco === "telefono"} icono="call-outline">
+              <TextInput
+                style={styles.input}
+                value={telefono}
+                onChangeText={setTelefono}
+                onFocus={() => setFoco("telefono")}
+                onBlur={() => setFoco(null)}
+                placeholder="Teléfono"
+                placeholderTextColor={colors.faint}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+              />
+            </CampoInput>
+          </>
+        )}
+
+        <CampoInput activo={foco === "email"} icono="person-outline">
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            onFocus={() => setFoco("email")}
+            onBlur={() => setFoco(null)}
+            placeholder="Correo"
+            placeholderTextColor={colors.faint}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+          />
+        </CampoInput>
+
+        <CampoInput activo={foco === "password"} icono="lock-closed-outline">
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            onFocus={() => setFoco("password")}
+            onBlur={() => setFoco(null)}
+            placeholder="Contraseña"
+            placeholderTextColor={colors.faint}
+            secureTextEntry={!verPass}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity onPress={() => setVerPass((v) => !v)} hitSlop={10}>
+            <Ionicons
+              name={verPass ? "eye-off-outline" : "eye-outline"}
+              size={19}
+              color="#9A8D86"
+            />
+          </TouchableOpacity>
+        </CampoInput>
+
+        {error && <Text style={styles.formError}>{error}</Text>}
+
+        <TouchableOpacity
+          style={[styles.cta, enviando && styles.ctaDisabled]}
+          onPress={entrar}
+          disabled={enviando}
+          activeOpacity={0.85}
+        >
+          {enviando ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.ctaText}>{esRegistro ? "Crear cuenta" : "Iniciar sesión"}</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* ===== o ===== */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>o</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* ===== Cambiar de modo · olvidé ===== */}
+        <View style={styles.pieRow}>
+          <Text style={styles.pieTexto}>
+            {esRegistro ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?"}
+          </Text>
+          <TouchableOpacity onPress={cambiarModo} hitSlop={8}>
+            <Text style={styles.pieEnlace}>
+              {esRegistro ? "Inicia sesión" : "Crear una"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {!esRegistro && (
+          <TouchableOpacity style={styles.olvidaste} onPress={() => setOlvide(true)} hitSlop={8}>
+            <Text style={styles.olvidasteText}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.legal}>
+          Al continuar aceptas los Términos{"\n"}y la Política de privacidad.
+        </Text>
       </ScrollView>
 
-      {olvide && (
-        <ModalOlvide emailInicial={email} onCerrar={() => setOlvide(false)} />
-      )}
+      {olvide && <ModalOlvide emailInicial={email} onCerrar={() => setOlvide(false)} />}
     </KeyboardAvoidingView>
+  );
+}
+
+/** Campo con borde coral y halo suave cuando está enfocado. */
+function CampoInput({
+  activo,
+  icono,
+  children,
+}: {
+  activo: boolean;
+  icono: keyof typeof Ionicons.glyphMap;
+  children: ReactNode;
+}) {
+  return (
+    <View style={[styles.campoHalo, activo && styles.campoHaloActivo]}>
+      <View style={[styles.inputRow, activo && styles.inputRowActivo]}>
+        <Ionicons name={icono} size={18} color="#9A8D86" />
+        {children}
+      </View>
+    </View>
   );
 }
 
@@ -347,119 +343,35 @@ function ModalOlvide({
   );
 }
 
-/**
- * Campo con el estado activo del diseño: borde coral + halo suave
- * (equivalente al box-shadow 0 0 0 4px #FFE7DF del mockup).
- */
-function CampoInput({
-  activo,
-  icono,
-  children,
-}: {
-  activo: boolean;
-  icono: keyof typeof Ionicons.glyphMap;
-  children: ReactNode;
-}) {
-  return (
-    <View style={[styles.campoHalo, activo && styles.campoHaloActivo]}>
-      <View style={[styles.inputRow, activo && styles.inputRowActivo]}>
-        <Ionicons name={icono} size={18} color="#9A8D86" />
-        {children}
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.paper },
+  pantalla: { flex: 1, backgroundColor: colors.surface },
+  contenido: { paddingHorizontal: 28, flexGrow: 1 },
 
-  hero: {
-    alignItems: "center",
-    paddingBottom: 56,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    overflow: "hidden",
-  },
-  circuloArriba: {
-    position: "absolute",
-    right: -40,
-    top: -30,
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  circuloAbajo: {
-    position: "absolute",
-    left: -30,
-    bottom: -50,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
+  marca: { alignItems: "center", marginBottom: 38 },
   logoBox: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
-    backgroundColor: "#FFF",
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: colors.fc,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
+    shadowColor: colors.fc,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    elevation: 5,
   },
-  logoText: { color: colors.fc, fontSize: 30, fontWeight: "800" },
-  title: { color: "#FFF", fontSize: 30, fontWeight: "800", letterSpacing: -0.6, marginTop: 14 },
-  sub: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    lineHeight: 20,
-    marginTop: 6,
+  logoText: { color: "#FFF", fontSize: 30, fontWeight: "800" },
+  wordmark: {
+    color: colors.ink,
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: -0.6,
+    marginTop: 14,
   },
 
-  card: {
-    backgroundColor: colors.surface,
-    marginHorizontal: 18,
-    marginTop: -22,
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 26,
-    shadowColor: "#28140A",
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
-  },
-
-  segment: {
-    flexDirection: "row",
-    backgroundColor: colors.paper,
-    borderRadius: 14,
-    padding: 5,
-    marginBottom: 22,
-  },
-  segmentItem: { flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: 10 },
-  segmentActive: {
-    backgroundColor: colors.surface,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  segmentActiveText: { color: colors.fc, fontSize: 14, fontWeight: "700" },
-  segmentText: { color: colors.muted, fontSize: 14, fontWeight: "600" },
-
-  inputLabel: { fontSize: 13, fontWeight: "700", color: colors.ink, marginBottom: 4 },
   // halo exterior (siempre presente para que el layout no salte al enfocar)
-  campoHalo: { borderRadius: 18, padding: 4, marginBottom: 10, backgroundColor: "transparent" },
+  campoHalo: { borderRadius: 18, padding: 4, marginBottom: 8, backgroundColor: "transparent" },
   campoHaloActivo: { backgroundColor: colors.fcSoft },
   inputRow: {
     flexDirection: "row",
@@ -475,44 +387,34 @@ const styles = StyleSheet.create({
   inputRowActivo: { borderColor: colors.fc },
   input: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink, paddingVertical: 0 },
 
-  olvidaste: { alignSelf: "flex-end", marginTop: 2, marginBottom: 16, marginRight: 4 },
-  olvidasteText: { color: colors.fc, fontSize: 13, fontWeight: "700" },
-  formError: { color: colors.fcDeep, fontSize: 13, fontWeight: "600", marginBottom: 10, marginLeft: 4 },
+  formError: { color: colors.fcDeep, fontSize: 13, fontWeight: "700", marginTop: 6, marginLeft: 4 },
 
   cta: {
     height: 54,
-    borderRadius: 15,
+    borderRadius: 14,
     backgroundColor: colors.fc,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 18,
     shadowColor: colors.fc,
-    shadowOpacity: 0.36,
+    shadowOpacity: 0.32,
     shadowRadius: 11,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     elevation: 5,
   },
   ctaDisabled: { opacity: 0.7 },
   ctaText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
 
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 20 },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 22 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.line },
-  dividerText: { fontSize: 12, fontWeight: "600", color: colors.faint },
+  dividerText: { fontSize: 12.5, fontWeight: "600", color: colors.faint },
 
-  socialRow: { flexDirection: "row", gap: 12 },
-  socialBtn: {
-    flex: 1,
-    height: 50,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-  },
-  googleG: { fontSize: 16, fontWeight: "800", color: "#EA4335" },
-  socialText: { fontSize: 14, fontWeight: "700", color: colors.ink },
+  pieRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 },
+  pieTexto: { fontSize: 14, fontWeight: "500", color: colors.muted },
+  pieEnlace: { fontSize: 14, fontWeight: "800", color: colors.fc },
+
+  olvidaste: { alignSelf: "center", marginTop: 16 },
+  olvidasteText: { color: colors.muted, fontSize: 13.5, fontWeight: "600" },
 
   legal: {
     textAlign: "center",
@@ -520,7 +422,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: colors.faint,
     lineHeight: 17,
-    marginTop: 20,
+    marginTop: "auto",
+    paddingTop: 32,
   },
 
   modalFondo: {

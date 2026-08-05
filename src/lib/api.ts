@@ -13,6 +13,7 @@ import type {
   Order,
   Store,
   StoreMenu,
+  Suscripcion,
   ValidacionPedido,
 } from "@/types";
 
@@ -112,37 +113,60 @@ export function getMisLocales(token: string): Promise<Store[]> {
 export interface UpdateStoreInput {
   nombre?: string;
   categoria?: string;
+  telefono?: string;
+  direccion?: string;
+  /** el interruptor de recibir pedidos */
+  estadoOperacion?: "abierto" | "cerrado";
+  envioBase?: number;
+  tiempoEstimadoMin?: number;
+  tiempoEstimadoMax?: number;
   /** uri local elegida con expo-image-picker */
   imagenUri?: string | null;
-  /** deja el local sin portada — ver §4.6 de BACKEND.md */
+  /** deja el local sin portada */
   quitarPortada?: boolean;
 }
 
-/** PUT /stores/:id — multipart/form-data, campos opcionales. */
+/**
+ * PUT /stores/:id — todos los campos son opcionales, manda solo lo que cambia.
+ * Usa multipart solo si hay foto; si no, JSON, que es más simple de depurar.
+ */
 export function updateStore(
   token: string,
   id: number,
-  { nombre, categoria, imagenUri, quitarPortada }: UpdateStoreInput,
+  datos: UpdateStoreInput,
 ): Promise<Store> {
-  const form = new FormData();
-  if (nombre) form.append("nombre", nombre);
-  if (categoria) form.append("categoria", categoria);
-  // Si además viene una foto nueva, manda el archivo: reemplazar gana sobre quitar.
-  if (quitarPortada && !imagenUri) form.append("quitarPortada", "true");
-  if (imagenUri) {
-    // Formato React Native: objeto { uri, name, type } (distinto al web)
-    form.append("portada", {
-      uri: imagenUri,
-      name: "portada.jpg",
-      type: "image/jpeg",
-    } as unknown as Blob);
+  const { imagenUri, quitarPortada, ...campos } = datos;
+
+  if (!imagenUri) {
+    const body: Record<string, unknown> = { ...campos };
+    if (quitarPortada) body.quitarPortada = true;
+    return pedir<Store>(`/stores/${id}`, { metodo: "PUT", body, token });
   }
-  return fetch(`${API_URL}/stores/${id}`, {
-    method: "PUT",
-    // OJO: NO poner Content-Type — fetch arma el boundary del multipart solo.
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  }).then((r) => parse<Store>(r));
+
+  const form = new FormData();
+  for (const [clave, valor] of Object.entries(campos)) {
+    if (valor !== undefined) form.append(clave, String(valor));
+  }
+  // Formato React Native: objeto { uri, name, type } (distinto al web)
+  form.append("portada", {
+    uri: imagenUri,
+    name: "portada.jpg",
+    type: "image/jpeg",
+  } as unknown as Blob);
+  return pedirForm<Store>(`/stores/${id}`, { metodo: "PUT", form, token });
+}
+
+/**
+ * POST /stores — crear un local. Nace `pendiente` (no sale en el Home hasta
+ * que un admin lo apruebe) y `cerrado` con `envioBase: 0`.
+ *
+ * `403` si no tiene el plan al día · `409` si llegó al tope de locales.
+ */
+export function crearLocal(
+  token: string,
+  datos: { nombre: string; categoria?: string; telefono?: string; direccion?: string },
+): Promise<Store> {
+  return pedir<Store>("/stores", { metodo: "POST", body: datos, token });
 }
 
 /* ================= LA CARTA (público) ================= */
@@ -496,6 +520,51 @@ export function getPedidosDelLocal(
   if (estado) query.set("estado", estado);
   if (desde) query.set("desde", desde);
   return pedir<Order[]>(`/stores/${storeId}/orders?${query}`, { token });
+}
+
+/* ================= PLAN DE COMERCIOS ================= */
+
+/**
+ * GET /suscripcion — la fuente de verdad.
+ *
+ * No mires `user.rol` para decidir qué mostrar: el JWT dura 7 días, así que
+ * después de pagar sigue diciendo `cliente`. Esto lee la base de datos.
+ */
+export function getSuscripcion(token: string): Promise<Suscripcion> {
+  return pedir<Suscripcion>("/suscripcion", { token });
+}
+
+/**
+ * POST /suscripcion/checkout — devuelve la URL de Stripe donde el usuario mete
+ * la tarjeta. Ni la app ni el backend tocan nunca un número de tarjeta.
+ *
+ * `409` si ya tiene una suscripción activa.
+ */
+export function crearCheckout(token: string): Promise<{ urlDePago: string }> {
+  return pedir<{ urlDePago: string }>("/suscripcion/checkout", { metodo: "POST", token });
+}
+
+/* ================= ADMIN ================= */
+
+/** GET /admin/stores?estado= — la cola de revisión, más antiguo primero. */
+export function getLocalesParaRevisar(
+  token: string,
+  estado: Store["estadoVerificacion"] = "pendiente",
+): Promise<Store[]> {
+  return pedir<Store[]>(`/admin/stores?estado=${estado}`, { token });
+}
+
+/** PATCH /admin/stores/:id/verificacion — aprobar o rechazar. */
+export function verificarLocal(
+  token: string,
+  storeId: number,
+  estado: "aprobado" | "rechazado",
+): Promise<Store> {
+  return pedir<Store>(`/admin/stores/${storeId}/verificacion`, {
+    metodo: "PATCH",
+    body: { estado },
+    token,
+  });
 }
 
 /* ================= IMÁGENES ================= */

@@ -35,6 +35,9 @@ function RootNavigator() {
         <Stack.Screen name="checkout" />
         <Stack.Screen name="pedido/[id]" />
         <Stack.Screen name="direcciones" />
+        <Stack.Screen name="plan" />
+        <Stack.Screen name="local-nuevo" />
+        <Stack.Screen name="admin/locales" />
         <Stack.Screen name="gestion/[storeId]" />
         <Stack.Screen name="gestion/plato" />
         <Stack.Screen name="gestion/pedidos/[storeId]" />

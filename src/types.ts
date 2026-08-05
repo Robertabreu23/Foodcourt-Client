@@ -11,15 +11,45 @@ export interface Store {
   tiempoEstimadoMin: number | null;
   tiempoEstimadoMax: number | null;
   colorMarca: string; // ej. "#C0392B" — fondo cuando no hay portada
-  portadaUrl: string | null; // ej. "/uploads/img-123.jpg" — anteponer API_URL
+  portadaUrl: string | null; // URL completa de Supabase, o null
+  telefono?: string | null;
+  direccion?: string | null;
 }
+
+export type Rol = "cliente" | "comercio" | "repartidor" | "admin";
 
 export interface User {
   id: number;
   nombre: string;
   email: string;
   telefono: string;
-  rol: string;
+  /**
+   * OJO: el rol del token se queda viejo. El JWT dura 7 días, así que después
+   * de pagar el plan sigue diciendo `cliente`. Para decidir qué mostrar usa
+   * `GET /suscripcion` (ver `Suscripcion.alDia`), que lee la base de datos.
+   */
+  rol: Rol | string;
+}
+
+/* ================= PLAN DE COMERCIOS ================= */
+
+export type EstadoSuscripcion =
+  | "sin_suscripcion"
+  | "pendiente"
+  | "activa"
+  | "vencida"
+  | "cancelada";
+
+/** GET /suscripcion — la fuente de verdad sobre si puede publicar locales. */
+export interface Suscripcion {
+  estado: EstadoSuscripcion;
+  /** lo único que de verdad importa: paga y no ha vencido */
+  alDia: boolean;
+  maxLocales: number;
+  localesUsados: number;
+  puedeCrearOtro: boolean;
+  /** ISO, o null si nunca ha pagado */
+  periodoFin: string | null;
 }
 
 export interface AuthResponse {
